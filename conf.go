@@ -13,6 +13,8 @@ const MAX_DEPTH = 10
 const SEPRATOR = "  "
 const SUFFIX = ".conf"
 
+var config *configTree
+
 type configTree struct {
 	node  map[string]*configTree
 	leave map[string]string
@@ -43,11 +45,43 @@ func main() {
 
 func test() {
 	//conf := parse("/home/ming/work")
-	conf := parse("testcase")
-	log.Println(conf)
+	Load("testcase")
+	log.Println(GetConf("test/1/level2_key1"))
+	log.Println(GetConf("test/test_group1/level2_key3"))
+	log.Println(GetConf("test/level1_key2"))
+	log.Println(GetConf("test/level1_key2"))
+	log.Println(GetConf("test1/1/level2_key1"))
+	log.Println(GetConf("test1/test_group1/level2_key1"))
+	log.Println(GetConf("test1/level1_key2"))
+	log.Println(GetConf("test1/level1_key2"))
+	log.Println(GetConf("test/1/level2_key"))
+	log.Println(GetConf("test1/test_group1/level2_key1"))
+	log.Println(GetConf("test/level1_key2/a/a/a/"))
+	log.Println(GetConf("test/level_key2"))
 }
 
 func Load(path string) {
+	config = parse(path)
+}
+
+func GetConf(path string) (value string) {
+	splitPath := strings.Split(strings.Trim(path, "/"), "/")
+
+	tmpConfig := config
+	for i := 0; i < len(splitPath); i++ {
+		if i < len(splitPath)-1 {
+			var ok bool
+			if tmpConfig, ok = tmpConfig.node[splitPath[i]]; !ok {
+				return
+			}
+		} else {
+			if _, ok := tmpConfig.leave[splitPath[i]]; ok {
+				value = tmpConfig.leave[splitPath[i]]
+			}
+			return
+		}
+	}
+	return
 }
 
 func parse(path string) *configTree {
