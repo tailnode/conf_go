@@ -1,4 +1,4 @@
-package main
+package conf
 
 import (
 	"bufio"
@@ -10,7 +10,6 @@ import (
 )
 
 const MAX_DEPTH = 10
-const SEPRATOR = "  "
 const SUFFIX = ".conf"
 
 var config *configTree
@@ -36,28 +35,6 @@ func (c *configTree) String() string {
 		str += k + ":" + v + "\n"
 	}
 	return str
-}
-
-func main() {
-	//getAllFile("/home/ming", 0)
-	test()
-}
-
-func test() {
-	//conf := parse("/home/ming/work")
-	Load("testcase")
-	log.Println(GetConf("test/1/level2_key1"))
-	log.Println(GetConf("test/test_group1/level2_key3"))
-	log.Println(GetConf("test/level1_key2"))
-	log.Println(GetConf("test/level1_key2"))
-	log.Println(GetConf("test1/1/level2_key1"))
-	log.Println(GetConf("test1/test_group1/level2_key1"))
-	log.Println(GetConf("test1/level1_key2"))
-	log.Println(GetConf("test1/level1_key2"))
-	log.Println(GetConf("test/1/level2_key"))
-	log.Println(GetConf("test1/test_group1/level2_key1"))
-	log.Println(GetConf("test/level1_key2/a/a/a/"))
-	log.Println(GetConf("test/level_key2"))
 }
 
 func Load(path string) {
