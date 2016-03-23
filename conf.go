@@ -15,15 +15,12 @@ import (
 const MAX_DEPTH = 10
 const SUFFIX = ".conf"
 
-var confRoot *Node
+var confRoot Node
 
-type Node struct {
-	node map[string]interface{}
-}
+type Node map[string]interface{}
 
-func newConfigTree() *Node {
-	node := make(map[string]interface{})
-	return &Node{node}
+func newNode() Node {
+	return make(map[string]interface{})
 }
 
 func Load(path string) {
@@ -39,14 +36,18 @@ func Load(path string) {
 	log.Println("finish load config", path)
 }
 
-func GetConf(path string) (value string) {
+func GetConf(path string) (value interface{}) {
+	value = ""
 	splitPath := strings.Split(strings.Trim(path, "/"), "/")
 
 	tmpConfig := confRoot
 	for i := 0; i < len(splitPath); i++ {
-		if node, ok := tmpConfig.node[splitPath[i]]; ok {
+		if node, ok := tmpConfig[splitPath[i]]; ok {
 			switch v := node.(type) {
-			case *Node:
+			case Node:
+				if i == len(splitPath)-1 {
+					return v
+				}
 				tmpConfig = v
 			case string:
 				if i == len(splitPath)-1 {
@@ -60,56 +61,41 @@ func GetConf(path string) (value string) {
 	return
 }
 
-func parse(path string) *Node {
-	log.Println("start parse", path)
-	info, err := os.Stat(path)
-	var config *Node
-	if err == nil && info.IsDir() {
-		// path is a directory
-		config = parseDir(path, 0)
-	} else if info, err = os.Stat(path + SUFFIX); err == nil && !info.IsDir() {
-		// path.conf is a configure file
-		config = parseFile(path + SUFFIX)
-	}
-	log.Println("finish parse", path)
-	return config
-}
-
-func parseDir(path string, depth int) *Node {
+func parseDir(path string, depth int) Node {
 	log.Printf("parse dir  [%v] current depth[%v]\n", path, depth)
 	if depth > MAX_DEPTH {
-		return nil
+		return newNode()
 	}
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		panic(err)
 	}
-	config := newConfigTree()
+	node := newNode()
 	for _, file := range files {
 		if file.IsDir() {
-			config.node[file.Name()] = parseDir(path+"/"+file.Name(), depth+1)
+			node[file.Name()] = parseDir(path+"/"+file.Name(), depth+1)
 		} else {
 			// only parse files have .conf suffix
 			if strings.HasSuffix(file.Name(), SUFFIX) {
 				base := strings.TrimRight(file.Name(), SUFFIX)
-				config.node[base] = parseFile(path + "/" + file.Name())
+				node[base] = parseFile(path + "/" + file.Name())
 			}
 		}
 	}
-	return config
+	return node
 }
 
-func parseFile(path string) *Node {
+func parseFile(path string) Node {
 	log.Printf("parse file [%v]\n", path)
 	f, err := os.Open(path)
 	if err != nil {
 		log.Println(err)
-		return nil
+		return newNode()
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(f))
-	config := newConfigTree()
-	currentNode := config
+	node := newNode()
+	currentNode := node
 	for scanner.Scan() {
 		str := scanner.Text()
 		commentIndex := strings.Index(str, "#")
@@ -126,19 +112,19 @@ func parseFile(path string) *Node {
 		//  key3 : value3
 		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
 			str = str[1 : len(str)-1]
-			config.node[str] = newConfigTree()
-			currentNode = (config.node[str]).(*Node)
+			node[str] = newNode()
+			currentNode = (node[str]).(Node)
 			continue
 		}
 		pairs := strings.SplitN(str, ":", 2)
 		// key:value
 		if len(pairs) == 2 && len(pairs[0]) > 0 && len(pairs[1]) > 0 {
-			currentNode.node[strings.TrimSpace(pairs[0])] = strings.TrimSpace(pairs[1])
+			currentNode[strings.TrimSpace(pairs[0])] = strings.TrimSpace(pairs[1])
 			continue
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "reading standard input:", err)
 	}
-	return config
+	return node
 }
