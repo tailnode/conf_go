@@ -1,3 +1,6 @@
+// parse configure from a directory or a file
+// configuer file must end with .conf subffix
+// call conf.Load() once to parse and then use conf.GetConf() to get config
 package conf
 
 import (
@@ -15,26 +18,12 @@ const SUFFIX = ".conf"
 var config *configTree
 
 type configTree struct {
-	node  map[string]*configTree
-	leave map[string]string
+	node map[string]interface{}
 }
 
 func newConfigTree() *configTree {
-	node := make(map[string]*configTree)
-	leave := make(map[string]string)
-	return &configTree{node, leave}
-}
-
-func (c *configTree) String() string {
-	var str string
-	for k, v := range c.node {
-		str += "[" + k + "]\n"
-		str += v.String()
-	}
-	for k, v := range c.leave {
-		str += k + ":" + v + "\n"
-	}
-	return str
+	node := make(map[string]interface{})
+	return &configTree{node}
 }
 
 func Load(path string) {
@@ -46,16 +35,17 @@ func GetConf(path string) (value string) {
 
 	tmpConfig := config
 	for i := 0; i < len(splitPath); i++ {
-		if i < len(splitPath)-1 {
-			var ok bool
-			if tmpConfig, ok = tmpConfig.node[splitPath[i]]; !ok {
+		if node, ok := tmpConfig.node[splitPath[i]]; ok {
+			switch v := node.(type) {
+			case *configTree:
+				tmpConfig = v
+			case string:
+				if i == len(splitPath)-1 {
+					value = v
+				}
 				return
+			default:
 			}
-		} else {
-			if _, ok := tmpConfig.leave[splitPath[i]]; ok {
-				value = tmpConfig.leave[splitPath[i]]
-			}
-			return
 		}
 	}
 	return
@@ -67,7 +57,7 @@ func parse(path string) *configTree {
 	var config *configTree
 	if err == nil && info.IsDir() {
 		// path is a directory
-		config = parseDir(path, MAX_DEPTH)
+		config = parseDir(path, 0)
 	} else if info, err = os.Stat(path + SUFFIX); err == nil && !info.IsDir() {
 		// path.conf is a configure file
 		config = parseFile(path + SUFFIX)
@@ -75,7 +65,9 @@ func parse(path string) *configTree {
 	log.Println("finish parse", path)
 	return config
 }
+
 func parseDir(path string, depth int) *configTree {
+	log.Printf("parse dir  [%v] current depth[%v]\n", path, depth)
 	if depth > MAX_DEPTH {
 		return nil
 	}
@@ -84,7 +76,6 @@ func parseDir(path string, depth int) *configTree {
 		panic(err)
 	}
 	config := newConfigTree()
-	log.Println("parse dir", path)
 	for _, file := range files {
 		if file.IsDir() {
 			config.node[file.Name()] = parseDir(path+"/"+file.Name(), depth+1)
@@ -100,13 +91,13 @@ func parseDir(path string, depth int) *configTree {
 }
 
 func parseFile(path string) *configTree {
+	log.Printf("parse file [%v]\n", path)
 	f, err := os.Open(path)
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
 	defer f.Close()
-	log.Println("parse file", path)
 	scanner := bufio.NewScanner(bufio.NewReader(f))
 	config := newConfigTree()
 	currentNode := config
@@ -127,13 +118,13 @@ func parseFile(path string) *configTree {
 		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
 			str = str[1 : len(str)-1]
 			config.node[str] = newConfigTree()
-			currentNode = config.node[str]
+			currentNode = (config.node[str]).(*configTree)
 			continue
 		}
 		pairs := strings.SplitN(str, ":", 2)
 		// key:value
 		if len(pairs) == 2 && len(pairs[0]) > 0 && len(pairs[1]) > 0 {
-			currentNode.leave[strings.TrimSpace(pairs[0])] = strings.TrimSpace(pairs[1])
+			currentNode.node[strings.TrimSpace(pairs[0])] = strings.TrimSpace(pairs[1])
 			continue
 		}
 	}
