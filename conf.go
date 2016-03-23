@@ -15,29 +15,38 @@ import (
 const MAX_DEPTH = 10
 const SUFFIX = ".conf"
 
-var config *configTree
+var confRoot *Node
 
-type configTree struct {
+type Node struct {
 	node map[string]interface{}
 }
 
-func newConfigTree() *configTree {
+func newConfigTree() *Node {
 	node := make(map[string]interface{})
-	return &configTree{node}
+	return &Node{node}
 }
 
 func Load(path string) {
-	config = parse(path)
+	log.Println("start load config", path)
+	info, err := os.Stat(path)
+	if err == nil && info.IsDir() {
+		// path is a directory
+		confRoot = parseDir(path, 0)
+	} else if info, err = os.Stat(path + SUFFIX); err == nil && !info.IsDir() {
+		// path.conf is a configure file
+		confRoot = parseFile(path + SUFFIX)
+	}
+	log.Println("finish load config", path)
 }
 
 func GetConf(path string) (value string) {
 	splitPath := strings.Split(strings.Trim(path, "/"), "/")
 
-	tmpConfig := config
+	tmpConfig := confRoot
 	for i := 0; i < len(splitPath); i++ {
 		if node, ok := tmpConfig.node[splitPath[i]]; ok {
 			switch v := node.(type) {
-			case *configTree:
+			case *Node:
 				tmpConfig = v
 			case string:
 				if i == len(splitPath)-1 {
@@ -51,10 +60,10 @@ func GetConf(path string) (value string) {
 	return
 }
 
-func parse(path string) *configTree {
+func parse(path string) *Node {
 	log.Println("start parse", path)
 	info, err := os.Stat(path)
-	var config *configTree
+	var config *Node
 	if err == nil && info.IsDir() {
 		// path is a directory
 		config = parseDir(path, 0)
@@ -66,7 +75,7 @@ func parse(path string) *configTree {
 	return config
 }
 
-func parseDir(path string, depth int) *configTree {
+func parseDir(path string, depth int) *Node {
 	log.Printf("parse dir  [%v] current depth[%v]\n", path, depth)
 	if depth > MAX_DEPTH {
 		return nil
@@ -90,7 +99,7 @@ func parseDir(path string, depth int) *configTree {
 	return config
 }
 
-func parseFile(path string) *configTree {
+func parseFile(path string) *Node {
 	log.Printf("parse file [%v]\n", path)
 	f, err := os.Open(path)
 	if err != nil {
@@ -118,7 +127,7 @@ func parseFile(path string) *configTree {
 		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
 			str = str[1 : len(str)-1]
 			config.node[str] = newConfigTree()
-			currentNode = (config.node[str]).(*configTree)
+			currentNode = (config.node[str]).(*Node)
 			continue
 		}
 		pairs := strings.SplitN(str, ":", 2)
