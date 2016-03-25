@@ -19,6 +19,19 @@ var confRoot Node
 
 type Node map[string]interface{}
 
+func copyNode(src Node) Node {
+	desc := newNode()
+	for k, v := range src {
+		switch v.(type) {
+		case Node:
+			desc[k] = copyNode(v.(Node))
+		case string:
+			desc[k] = v
+		}
+	}
+	return desc
+}
+
 func newNode() Node {
 	return make(map[string]interface{})
 }
@@ -46,7 +59,8 @@ func GetConf(path string) (value interface{}) {
 			switch v := node.(type) {
 			case Node:
 				if i == len(splitPath)-1 {
-					return v
+					// make a Node copy to avoid the caller change inner data by GetConf()
+					return copyNode(v)
 				}
 				tmpConfig = v
 			case string:
