@@ -37,6 +37,8 @@ func newNode() Node {
 }
 
 func Load(path string) {
+	confRoot = newNode()
+
 	log.Println("start load config", path)
 	info, err := os.Stat(path)
 	if err == nil && info.IsDir() {
@@ -45,11 +47,24 @@ func Load(path string) {
 	} else if info, err = os.Stat(path + SUFFIX); err == nil && !info.IsDir() {
 		// path.conf is a configure file
 		confRoot = parseFile(path + SUFFIX)
+	} else {
+		log.Println(err)
 	}
 	log.Println("finish load config", path)
 }
 
 func GetConf(path string) (value interface{}) {
+	// when path is an empty string return all configs
+	if path == "" {
+		// when confRoot is an empty map, return an empty string to consistent with other path parameters
+		// like GetConf("notexist") return ""
+		if len(confRoot) == 0 {
+			return ""
+		} else {
+			return copyNode(confRoot)
+		}
+	}
+
 	value = ""
 	splitPath := strings.Split(strings.Trim(path, "/"), "/")
 

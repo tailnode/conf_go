@@ -71,4 +71,24 @@ func TestGetConf(t *testing.T) {
 	if reflect.DeepEqual(casedir3, c) == false {
 		t.Errorf("failed [%v]:[%v] , want [%v]", "casedir3", c, casedir3)
 	}
+
+	Load("testcase/casedir3")
+	c = GetConf("")
+	if reflect.DeepEqual(casedir3, c) == false {
+		t.Errorf("failed [%v]:[%v] , want [%v]", "casedir3", c, casedir3)
+	}
+
+	Load("notexist")
+	cases = []struct {
+		path, value string
+	}{
+		{"notexistcase", ""},
+		{"", ""},
+		{"k/k/k", ""},
+	}
+	for _, c := range cases {
+		if v := GetConf(c.path); v != c.value {
+			t.Errorf("failed [%v]:[%v] , want [%v]", c.path, v, c.value)
+		}
+	}
 }
